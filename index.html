@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>D&D Horde Manager - Calcolo Preciso</title>
+    <style>
+        :root { --danger: #8b0000; --accent: #ff4500; --bg: #121212; --panel: #1e1e1e; }
+        body { background: var(--bg); color: #ccc; font-family: 'Segoe UI', sans-serif; margin: 10px; font-size: 0.9em; }
+        h1 { color: var(--accent); margin: 0 0 10px 0; font-size: 1.4em; text-align: center; text-transform: uppercase; }
+        
+        .main-grid { display: grid; grid-template-columns: 280px 1fr; gap: 15px; }
+        .setup-area { background: var(--panel); padding: 15px; border-radius: 8px; border: 1px solid #333; }
+        .horde-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+
+        .card { background: #252525; border: 1px solid #444; padding: 10px; border-radius: 6px; }
+        .orda-card { border-left: 5px solid var(--danger); animation: pulse 3s infinite; }
+        .pc-card { border-top: 4px solid #4a90e2; }
+        
+        input { width: 90%; margin: 4px 0; padding: 6px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; }
+        .edit-input { width: 50px; padding: 2px; background: #111; border: 1px solid #444; color: #ff4500; font-weight: bold; text-align: center; }
+        
+        button { cursor: pointer; background: var(--danger); color: white; border: none; padding: 8px; margin: 3px 0; border-radius: 4px; font-weight: bold; width: 100%; }
+        button:hover { background: var(--accent); }
+        .btn-small { width: auto; padding: 4px 8px; font-size: 0.8em; margin: 2px; }
+
+        .stat-line { font-size: 0.85em; color: #bbb; margin: 5px 0; }
+        .log-area { margin-top: 15px; background: #000; padding: 15px; border-top: 3px solid var(--danger); height: 200px; overflow-y: auto; }
+        #combatLog { font-size: 1.2em; color: #00ff00; font-family: 'Consolas', monospace; }
+
+        @keyframes pulse { 0% { box-shadow: 0 0 5px #8b0000; } 50% { box-shadow: 0 0 15px #8b0000; } 100% { box-shadow: 0 0 5px #8b0000; } }
+        .row { display: flex; gap: 5px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+
+    <h1>Horde Manager 3.0 - Calcolo dadi PRO</h1>
+
+    <div class="main-grid">
+        <div class="setup-area">
+            <h3>Eroe (PG)</h3>
+            <input type="text" id="pcName" placeholder="Nome">
+            <input type="number" id="pcAC" placeholder="CA">
+            <input type="number" id="pcHP" placeholder="PF">
+            <button onclick="addPC()">AGGIUNGI PG</button>
+            <hr style="border:0; border-top:1px solid #444; margin:15px 0;">
+            <h3>Orda (PNG)</h3>
+            <input type="text" id="hName" placeholder="Tipo (es. Ogre)">
+            <input type="number" id="hAtk" placeholder="Bonus Attacco">
+            <input type="text" id="hDmg" placeholder="Danno (es. 2d8+4)">
+            <input type="number" id="hHP" placeholder="PF Singolo">
+            <input type="number" id="hQty" placeholder="Quantità">
+            <button onclick="addHorde()" style="background:#444">CREA ORDA</button>
+        </div>
+
+        <div>
+            <div id="pcList" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;"></div>
+            <div id="hordeList" class="horde-grid"></div>
+        </div>
+    </div>
+
+    <div class="log-area"><div id="combatLog">> Benvenuto, DM.</div></div>
+
+<script>
+    let players = [];
+    let hordes = [];
+
+    // --- LOGICA ANALISI DADI (REGULATED) ---
+    function parseDndDamage(input) {
+        // Rimuove spazi e trasforma in minuscolo
+        let s = input.toString().toLowerCase().replace(/\s+/g, '');
+        
+        // Cerca il pattern: [numero dadi]d[facce][+ o -][modificatore]
+        const diceRegex = /^(\d+)d(\d+)([+-]\d+)?$/;
+        const match = s.match(diceRegex);
+
+        if (match) {
+            const numDice = parseInt(match[1]);
+            const sides = parseInt(match[2]);
+            const modifier = match[3] ? parseInt(match[3]) : 0;
+            
+            // Calcolo media precisa: ((facce + 1) / 2 * numero dadi) + modificatore
+            const average = (numDice * (sides + 1) / 2) + modifier;
+            // Arrotondiamo per difetto come da manuale D&D
+            return Math.floor(average);
+        }
+
+        // Se non è un dado, prova a vedere se è un numero fisso
+        const fixed = parseInt(s);
+        return isNaN(fixed) ? 0 : fixed;
+    }
+
+    function addPC() {
+        const name = document.getElementById('pcName').value;
+        const ac = parseInt(document.getElementById('pcAC').value);
+        const hp = parseInt(document.getElementById('pcHP').value);
+        if(name && !isNaN(ac)) { players.push({name, ac, hp}); updateUI(); }
+    }
+
+    function addHorde() {
+        const name = document.getElementById('hName').value;
+        const atk = parseInt(document.getElementById('hAtk').value);
+        const dmgStr = document.getElementById('hDmg').value;
+        const hp = parseInt(document.getElementById('hHP').value);
+        const qty = parseInt(document.getElementById('hQty').value);
+        
+        if(name && !isNaN(qty)) { 
+            hordes.push({
+                name, atk, 
+                dmgStr, 
+                calculatedDmg: parseDndDamage(dmgStr), // Calcola subito la media
+                hpPerUnit: hp, 
+                qty: qty, 
+                totalHP: hp * qty 
+            }); 
+            updateUI(); 
+        }
+    }
+
+    function getRatio(diff) {
+        if (diff <= 5) return 1; if (diff <= 12) return 2; if (diff <= 14) return 3;
+        if (diff <= 16) return 4; if (diff <= 18) return 5; if (diff <= 19) return 10;
+        return 20;
+    }
+
+    function attack(hIdx, pIdx) {
+        const h = hordes[hIdx];
+        const p = players[pIdx];
+        const ratio = getRatio(p.ac - h.atk);
+        const hits = Math.floor(h.qty / ratio);
+        const totalDmg = hits * h.calculatedDmg;
+        
+        if (hits > 0) {
+            p.hp -= totalDmg;
+            log(`${h.name} colpisce ${p.name}: ${hits} colpi (Media: ${h.calculatedDmg} cad.) -> **${totalDmg} danni totali**`);
+        } else {
+            log(`${h.name} non abbastanza numerosa per colpire la CA ${p.ac} (servirebbero ${ratio} unità).`);
+        }
+        updateUI();
+    }
+
+    function updateStat(i, stat, val) { players[i][stat] = parseInt(val) || 0; }
+
+    function damageHorde(idx) {
+        const d = parseInt(prompt("Danno totale all'orda:"));
+        if(isNaN(d)) return;
+        const h = hordes[idx];
+        h.totalHP -= d;
+        if(h.totalHP <= 0) { hordes.splice(idx, 1); } 
+        else { h.qty = Math.ceil(h.totalHP / h.hpPerUnit); }
+        updateUI();
+    }
+
+    function splitHorde(idx) {
+        const h = hordes[idx];
+        const n = parseInt(prompt(`Quante unità staccare da ${h.name}?`));
+        if(n > 0 && n < h.qty) {
+            const newH = JSON.parse(JSON.stringify(h));
+            newH.qty = n; newH.totalHP = n * h.hpPerUnit; newH.name += " (Dist.)";
+            h.qty -= n; h.totalHP = h.qty * h.hpPerUnit;
+            hordes.push(newH);
+            updateUI();
+        }
+    }
+
+    function log(msg) {
+        const l = document.getElementById('combatLog');
+        l.innerHTML = `> ${msg}<br>${l.innerHTML}`;
+    }
+
+    function updateUI() {
+        // Render PG
+        document.getElementById('pcList').innerHTML = players.map((p, i) => `
+            <div class="card pc-card" style="min-width:180px">
+                <div style="display:flex; justify-content:space-between"><strong>${p.name}</strong><span onclick="players.splice(${i},1);updateUI()" style="cursor:pointer">✕</span></div>
+                <div class="stat-line">
+                    CA: <input type="number" class="edit-input" value="${p.ac}" onchange="updateStat(${i},'ac',this.value)">
+                    PF: <input type="number" class="edit-input" value="${p.hp}" onchange="updateStat(${i},'hp',this.value)">
+                </div>
+            </div>
+        `).join('');
+
+        // Render Orde
+        document.getElementById('hordeList').innerHTML = hordes.map((h, i) => `
+            <div class="card orda-card">
+                <div style="display:flex; justify-content:space-between">
+                    <strong style="color:var(--accent)">${h.name}</strong>
+                    <span class="badge" style="background:var(--danger); padding:2px 6px; border-radius:10px">x${h.qty}</span>
+                </div>
+                <div class="stat-line">
+                    Atk: +${h.atk} | Danno: ${h.dmgStr} <br>
+                    <small>(Media rilevata: <b>${h.calculatedDmg}</b>)</small>
+                </div>
+                <div class="row">${players.map((p, pi) => `<button class="btn-small" onclick="attack(${i},${pi})">VS ${p.name}</button>`).join('')}</div>
+                <div class="row" style="margin-top:8px">
+                    <button style="background:#444; flex:1" onclick="damageHorde(${i})">Danno</button>
+                    <button style="background:#333; flex:1" onclick="splitHorde(${i})">Split</button>
+                    <button style="background:#111; width:30px" onclick="hordes.splice(${i},1);updateUI()">✕</button>
+                </div>
+            </div>
+        `).join('');
+    }
+</script>
+</body>
+</html>
