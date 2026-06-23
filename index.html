@@ -4,36 +4,288 @@
     <meta charset="UTF-8">
     <title>D&D Horde Manager - Calcolo Preciso</title>
     <style>
-        :root { --danger: #8b0000; --accent: #ff4500; --bg: #121212; --panel: #1e1e1e; }
-        body { background: var(--bg); color: #ccc; font-family: 'Segoe UI', sans-serif; margin: 10px; font-size: 0.9em; }
-        h1 { color: var(--accent); margin: 0 0 10px 0; font-size: 1.4em; text-align: center; text-transform: uppercase; }
-        
-        .main-grid { display: grid; grid-template-columns: 280px 1fr; gap: 15px; }
-        .setup-area { background: var(--panel); padding: 15px; border-radius: 8px; border: 1px solid #333; }
-        .horde-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+        /* Importazione dei font Fantasy */
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Marcellus&family=MedievalSharp&display=swap');
 
-        .card { background: #252525; border: 1px solid #444; padding: 10px; border-radius: 6px; }
-        .orda-card { border-left: 5px solid var(--danger); animation: pulse 3s infinite; }
-        .pc-card { border-top: 4px solid #4a90e2; }
-        
-        input { width: 90%; margin: 4px 0; padding: 6px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; }
-        .edit-input { width: 50px; padding: 2px; background: #111; border: 1px solid #444; color: #ff4500; font-weight: bold; text-align: center; }
-        
-        button { cursor: pointer; background: var(--danger); color: white; border: none; padding: 8px; margin: 3px 0; border-radius: 4px; font-weight: bold; width: 100%; }
-        button:hover { background: var(--accent); }
-        .btn-small { width: auto; padding: 4px 8px; font-size: 0.8em; margin: 2px; }
+        :root { 
+            --danger: #9e1b1b; 
+            --accent: #d4af37; 
+            --bg: #140f0b; 
+            --panel: #261b14; 
+            --text: #e6dfd3;
+            --text-muted: #a69888;
+        }
 
-        .stat-line { font-size: 0.85em; color: #bbb; margin: 5px 0; }
-        .log-area { margin-top: 15px; background: #000; padding: 15px; border-top: 3px solid var(--danger); height: 200px; overflow-y: auto; }
-        #combatLog { font-size: 1.2em; color: #00ff00; font-family: 'Consolas', monospace; }
+        /* Layout bloccato sull'altezza dello schermo (100vh) */
+        body { 
+            background: var(--bg); 
+            background-image: radial-gradient(circle at center, #2b1e15 0%, #0c0806 100%);
+            color: var(--text); 
+            font-family: 'Marcellus', Georgia, serif; 
+            margin: 0;
+            padding: 15px; 
+            font-size: 0.95em; 
+            line-height: 1.4;
+            box-sizing: border-box;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Nessuno scroll globale */
+        }
 
-        @keyframes pulse { 0% { box-shadow: 0 0 5px #8b0000; } 50% { box-shadow: 0 0 15px #8b0000; } 100% { box-shadow: 0 0 5px #8b0000; } }
-        .row { display: flex; gap: 5px; flex-wrap: wrap; }
+        h1 { 
+            color: var(--accent); 
+            font-family: 'Cinzel', serif;
+            font-weight: 800;
+            margin: 0 0 15px 0; 
+            font-size: 1.6em; 
+            text-align: center; 
+            text-transform: uppercase; 
+            letter-spacing: 2px;
+            text-shadow: 0 0 12px rgba(212, 175, 55, 0.4), 2px 2px 4px #000;
+            border-bottom: 2px double var(--accent);
+            padding-bottom: 10px;
+        }
+
+        .main-grid { 
+            display: grid; 
+            grid-template-columns: 300px 1fr; 
+            gap: 20px; 
+            flex: 1;
+            min-height: 0; 
+        }
+
+        /* --- SETUP AREA COMPATTA (Senza Scroll) --- */
+        .setup-area { 
+            background: var(--panel); 
+            padding: 15px; 
+            border-radius: 4px; 
+            border: 2px solid #5c4331; 
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.7), 0 8px 16px rgba(0, 0, 0, 0.6);
+            overflow: hidden; /* Impedisce la comparsa di scrollbar qui */
+            
+            /* Trasforma l'area in una griglia per affiancare i campi di input */
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 10px;
+            align-content: start;
+        }
+
+        /* Elementi a larghezza intera */
+        .setup-area h3, 
+        .setup-area hr, 
+        .setup-area button, 
+        #pcName, 
+        #hName {
+            grid-column: 1 / -1;
+        }
+
+        .setup-area h3 {
+            font-family: 'Cinzel', serif;
+            color: var(--accent);
+            margin: 0 0 2px 0;
+            border-left: 3px solid var(--danger);
+            padding-left: 10px;
+            letter-spacing: 1px;
+        }
+
+        .setup-area hr { margin: 5px 0; width: 100%; }
+
+        /* Area destra per Carte: l'unica parte che scrolla */
+        .main-grid > div:last-child {
+            overflow-y: auto;
+            height: 100%;
+            padding-right: 5px;
+        }
+
+        .horde-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+            gap: 15px; 
+        }
+
+        /* Gestione Carte Interfaccia */
+        .card { 
+            background: #1c140f; 
+            border: 2px solid #4a3627; 
+            padding: 14px; 
+            border-radius: 4px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-sizing: border-box;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.7);
+        }
+
+        .orda-card { 
+            border: 2px solid var(--danger) !important; 
+            border-left: 6px solid var(--danger) !important;
+            background: linear-gradient(135deg, #241313, #140b0b) !important;
+            animation: pulse 3s infinite; 
+        }
+
+        .pc-card { 
+            border: 2px solid #2b4c6f !important; 
+            border-top: 5px solid #3a7bd5 !important;
+            background: linear-gradient(135deg, #111b24, #0b1017) !important;
+        }
+
+        .pc-card strong {
+            color: #5dade2;
+            font-family: 'Cinzel', serif;
+            font-size: 1.1em;
+        }
+
+        /* Campi di Input */
+        input { 
+            width: 100%; 
+            margin: 0; /* Azzerato per via del gap del CSS Grid */
+            padding: 8px; 
+            background: #0d0a08; 
+            color: #fff; 
+            border: 1px solid #5c4331; 
+            border-radius: 3px; 
+            font-family: 'Marcellus', serif;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+            outline: none;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.8), 0 0 8px rgba(212, 175, 55, 0.3);
+        }
+
+        input::placeholder { color: #6e5441; font-style: italic; }
+
+        .edit-input { 
+            width: 55px !important; 
+            padding: 4px !important; 
+            background: #050403 !important; 
+            border: 1px solid #4a3627 !important; 
+            color: var(--accent) !important; 
+            font-weight: bold; 
+            text-align: center; 
+            font-family: monospace !important;
+            display: inline-block;
+            margin: 0 4px;
+        }
+
+        /* Pulsanti */
+        button { 
+            cursor: pointer; 
+            background: linear-gradient(135deg, var(--danger), #570f0f); 
+            color: #fff; 
+            border: 1px solid #bd2828; 
+            padding: 10px; 
+            margin: 4px 0 0 0; 
+            border-radius: 3px; 
+            font-family: 'Cinzel', serif;
+            font-weight: bold; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 100%; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+            transition: all 0.2s ease;
+        }
+
+        button:hover { 
+            background: linear-gradient(135deg, #bd2828, var(--danger)); 
+            border-color: var(--accent);
+            box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+        }
+
+        /* Intercettazione stile inline pulsanti */
+        .setup-area button[style*="background:#444"] {
+            background: linear-gradient(135deg, #4d3826, #2e2116) !important;
+            border-color: #735439 !important;
+        }
+        .setup-area button[style*="background:#444"]:hover {
+            border-color: var(--accent) !important;
+            background: linear-gradient(135deg, #5c432e, #3d2c1e) !important;
+        }
+
+        .card button[style*="background:#444"] {
+            background: linear-gradient(135deg, #781c1c, #4a1010) !important;
+            border: 1px solid #a83232 !important;
+        }
+        .card button[style*="background:#333"] {
+            background: linear-gradient(135deg, #4d3b2c, #2e231a) !important;
+            border: 1px solid #705741 !important;
+        }
+        .card button[style*="background:#111"] {
+            background: linear-gradient(135deg, #261414, #140b0b) !important;
+            border: 1px solid #542525 !important;
+            color: #e74c3c !important;
+        }
+
+        .btn-small { 
+            width: auto; 
+            padding: 5px 10px; 
+            font-size: 0.75em; 
+            margin: 3px; 
+            background: linear-gradient(135deg, #36291e, #1c150f) !important;
+            border: 1px solid #5c4331 !important;
+            color: var(--accent) !important;
+            text-transform: none;
+        }
+
+        /* Dettagli e Badge */
+        .stat-line { font-size: 0.9em; color: var(--text-muted); margin: 8px 0; }
+        .stat-line b, .stat-line strong { color: #fff; }
+        
+        .badge {
+            border: 1px solid #bd2828 !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            font-family: 'Cinzel', serif;
+            color: #fff !important;
+        }
+
+        /* Log Scrigno ancorato e fisso sul fondo */
+        .log-area { 
+            margin-top: 15px; 
+            background: #080605; 
+            padding: 15px; 
+            border: 2px solid #4a3627;
+            border-top: 4px solid var(--danger) !important; 
+            height: 160px; 
+            min-height: 160px;
+            flex-shrink: 0; /* Impedisce che si rimpicciolisca */
+            overflow-y: auto; 
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.9);
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        #combatLog { 
+            font-size: 1.15em; 
+            color: #dfb887; 
+            font-family: 'MedievalSharp', 'Marcellus', serif; 
+            line-height: 1.5;
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes pulse { 
+            0% { box-shadow: 0 0 5px #8a1c1c; border-color: #8a1c1c; } 
+            50% { box-shadow: 0 0 15px #bd2828; border-color: #bd2828; } 
+            100% { box-shadow: 0 0 5px #8a1c1c; border-color: #8a1c1c; } 
+        }
+
+        .row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        /* Scrollbar personalizzata fantasy */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0d0a08; }
+        ::-webkit-scrollbar-thumb { background: #4a3627; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
     </style>
 </head>
 <body>
 
-    <h1>Horde Manager 3.0 - Calcolo dadi PRO</h1>
+    <h1>Horde Manager - Gestisci le tue Orde!</h1>
 
     <div class="main-grid">
         <div class="setup-area">
@@ -66,10 +318,7 @@
 
     // --- LOGICA ANALISI DADI (REGULATED) ---
     function parseDndDamage(input) {
-        // Rimuove spazi e trasforma in minuscolo
         let s = input.toString().toLowerCase().replace(/\s+/g, '');
-        
-        // Cerca il pattern: [numero dadi]d[facce][+ o -][modificatore]
         const diceRegex = /^(\d+)d(\d+)([+-]\d+)?$/;
         const match = s.match(diceRegex);
 
@@ -77,14 +326,10 @@
             const numDice = parseInt(match[1]);
             const sides = parseInt(match[2]);
             const modifier = match[3] ? parseInt(match[3]) : 0;
-            
-            // Calcolo media precisa: ((facce + 1) / 2 * numero dadi) + modificatore
             const average = (numDice * (sides + 1) / 2) + modifier;
-            // Arrotondiamo per difetto come da manuale D&D
             return Math.floor(average);
         }
 
-        // Se non è un dado, prova a vedere se è un numero fisso
         const fixed = parseInt(s);
         return isNaN(fixed) ? 0 : fixed;
     }
@@ -107,7 +352,7 @@
             hordes.push({
                 name, atk, 
                 dmgStr, 
-                calculatedDmg: parseDndDamage(dmgStr), // Calcola subito la media
+                calculatedDmg: parseDndDamage(dmgStr),
                 hpPerUnit: hp, 
                 qty: qty, 
                 totalHP: hp * qty 
@@ -131,7 +376,7 @@
         
         if (hits > 0) {
             p.hp -= totalDmg;
-            log(`${h.name} colpisce ${p.name}: ${hits} colpi (Media: ${h.calculatedDmg} cad.) -> **${totalDmg} danni totali**`);
+            log(`${h.name} colpisce ${p.name}: ${hits} colpi (Media: ${h.calculatedDmg} cad.) -> <b>${totalDmg} danni totali!</b>`);
         } else {
             log(`${h.name} non abbastanza numerosa per colpire la CA ${p.ac} (servirebbero ${ratio} unità).`);
         }
@@ -144,9 +389,27 @@
         const d = parseInt(prompt("Danno totale all'orda:"));
         if(isNaN(d)) return;
         const h = hordes[idx];
+        
+        // Memorizziamo la quantità prima del danno per fare il confronto
+        const oldQty = h.qty; 
+
         h.totalHP -= d;
-        if(h.totalHP <= 0) { hordes.splice(idx, 1); } 
-        else { h.qty = Math.ceil(h.totalHP / h.hpPerUnit); }
+        
+        // Se l'orda viene annientata
+        if(h.totalHP <= 0) { 
+            log(`⚔️ <b>${h.name}</b> subisce ${d} danni: l'intera orda (<b>${oldQty} unità</b>) è stata spazzata via!`);
+            hordes.splice(idx, 1); 
+        } else { 
+            // Ricalcoliamo le unità rimaste vive e troviamo la differenza
+            h.qty = Math.ceil(h.totalHP / h.hpPerUnit); 
+            const deadUnits = oldQty - h.qty;
+            
+            if (deadUnits > 0) {
+                log(`⚔️ <b>${h.name}</b> subisce ${d} danni: <b>${deadUnits} unità</b> cadono in battaglia!`);
+            } else {
+                log(`⚔️ <b>${h.name}</b> subisce ${d} danni, ma nessuna unità muore.`);
+            }
+        }
         updateUI();
     }
 
